@@ -94,8 +94,6 @@ services:
   warp:
     image: warp10io/warp10:1.2.19
     restart: always
-    logging:
-      driver: none
     ports:
       - "8081:8080"
       - "8082:8081"
@@ -103,3 +101,4 @@ services:
     volumes:
       - ./start.sh:/opt/warp10/etc/start.sh
       - ./conf-standalone.conf:/opt/warp10/etc/conf-standalone.conf
+      - ./warpscripts:/opt/warp10/warpscripts
