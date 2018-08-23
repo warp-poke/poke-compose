@@ -1,0 +1,105 @@
+version: '3'
+services:
+  # PostgreSQL
+  pg:
+    image: postgres
+    restart: always
+    logging:
+      driver: none
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_USER}
+      POSTGRES_DB: ${DB_USER}
+
+  # Kafka stuff
+  zookeeper:
+    restart: always
+    logging:
+      driver: none
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+
+  kafka:
+    restart: always
+    logging:
+      driver: none
+    image: wurstmeister/kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # TODO: host.docker.internal is only for mac...
+      KAFKA_ADVERTISED_HOST_NAME: "kafka"
+      KAFKA_CREATE_TOPICS: "${HTTP_CHECK_TOPIC}:1:1,${DNS_CHECK_TOPIC}:1:1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # Poke API stuff
+  ui:
+    restart: always
+    logging:
+      driver: none
+    image: wpoke/poke-ui:latest
+    ports:
+      - "8080:8080"
+    command: ["npm", "run", "start"]
+
+  api:
+    image: wpoke/poke-api:latest
+    restart: always
+    ports:
+      - "9000:9000"
+    command: ["/opt/bin/poke-api"]
+    environment:
+      EVOLUTIONS_AUTOAPPLY: "true"
+      SCHEDULER_ENABLED: "false"
+      APP_SECRET: "some-awesome-secret"
+      MACAROONS_SECRET: "i-love-macaroons"
+      JAAS_PATH: "conf/kafkacreds.jaas"
+      INTERNAL_AUTH_TOKEN: "internal-auth-token"
+      POSTGRESQL_ADDON_URI: "postgresql://pg:5432"
+      POSTGRESQL_ADDON_DB: "${DB_USER}"
+      POSTGRESQL_ADDON_PORT: "5432"
+      POSTGRESQL_ADDON_USER: "${DB_USER}"
+      POSTGRESQL_ADDON_PASSWORD: "${DB_USER}"
+      POSTGRESQL_ADDON_HOST: "pg"
+      WARP_PRODUCER: "ACB70B01-EC5C-4EAF-B4BD-CAA687C9A72B"
+      WARP_SIP_HASH_APP: "${WARP_SHORT_KEY}"
+      WARP_SIP_HASH_TOKEN: "${WARP_SHORT_KEY}"
+      WARP_AES_TOKEN: "${WARP_LONG_KEY}"
+      WARP_ENDPOINT: "warp:8080"
+      KAFKA_HOST: "kafka:9092"
+      KAFKA_HTTPCHECKS_TOPIC: "${HTTP_CHECK_TOPIC}"
+      KAFKA_ENDPOINT: "kafka:9092"
+      KAFKA_WRITER_USER: ""
+      KAFKA_WRITER_PASSWORD: ""
+      KAFKA_SECURITY_PROTOCOL: "PLAINTEXT"
+      WARP_APP: "poke"
+
+  http-agent:
+    image: wpoke/http-rust-agent:latest
+    command: ["/usr/bin/poke-agent", "daemon", "-c", "/etc/poke-agent/config.toml"]
+    environment:
+      BROKER: "kafka:9092"
+      TOPIC: "${HTTP_CHECK_TOPIC}"
+      CONSUMER_GROUP: "http-agent-consumer-group"
+      HOST: 'docker.local'
+      ZONE: 'localhost'
+    links:
+      - kafka
+
+  warp:
+    image: warp10io/warp10:1.2.19
+    restart: always
+    logging:
+      driver: none
+    ports:
+      - "8081:8080"
+      - "8082:8081"
+    command: "/opt/warp10/etc/start.sh"
+    volumes:
+      - ./start.sh:/opt/warp10/etc/start.sh
+      - ./conf-standalone.conf:/opt/warp10/etc/conf-standalone.conf
