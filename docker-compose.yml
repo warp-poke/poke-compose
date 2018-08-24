@@ -1,5 +1,6 @@
 version: '3'
 services:
+
   # PostgreSQL
   pg:
     image: postgres
@@ -37,7 +38,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
-  # Poke API stuff
+  # Poke stuff
   ui:
     restart: always
     logging:
@@ -46,6 +47,8 @@ services:
     ports:
       - "8080:8080"
     command: ["npm", "run", "start"]
+    volumes:
+      - ./ressources/poke-ui/conf.json:/app/src/assets/conf.json
 
   api:
     image: wpoke/poke-api:latest
@@ -83,6 +86,7 @@ services:
     image: wpoke/http-rust-agent:latest
     command: ["/usr/bin/poke-agent", "daemon", "-c", "/etc/poke-agent/config.toml"]
     environment:
+      RUSTLOG: info
       BROKER: "kafka:9092"
       TOPIC: "${HTTP_CHECK_TOPIC}"
       CONSUMER_GROUP: "http-agent-consumer-group"
@@ -91,14 +95,29 @@ services:
     links:
       - kafka
 
+  dns-agent:
+    image: wpoke/dns-rust-agent:latest
+    command: ["/usr/bin/dns-agent", "-c", "/etc/poke-agent/config.toml"]
+    environment:
+      RUSTLOG: info
+      BROKER: "kafka:9092"
+      TOPIC: "${DNS_CHECK_TOPIC}"
+      CONSUMER_GROUP: "dns-agent-consumer-group"
+      HOST: 'docker.local'
+      ZONE: 'localhost'
+      DNS: 8.8.8.8:53
+    links:
+      - kafka
+
   warp:
     image: warp10io/warp10:1.2.19
     restart: always
+    logging:
+      driver: none
     ports:
       - "8081:8080"
-      - "8082:8081"
     command: "/opt/warp10/etc/start.sh"
     volumes:
-      - ./start.sh:/opt/warp10/etc/start.sh
-      - ./conf-standalone.conf:/opt/warp10/etc/conf-standalone.conf
-      - ./warpscripts:/opt/warp10/warpscripts
+      - ./ressources/warp/bin/start.sh:/opt/warp10/etc/start.sh
+      - ./ressources/warp/etc/conf-standalone.conf:/opt/warp10/etc/conf-standalone.conf
+      - ./ressources/warp/warpscripts:/opt/warp10/warpscripts
