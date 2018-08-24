@@ -31,7 +31,6 @@ services:
     ports:
       - "9092:9092"
     environment:
-      # TODO: host.docker.internal is only for mac...
       KAFKA_ADVERTISED_HOST_NAME: "kafka"
       KAFKA_CREATE_TOPICS: "${HTTP_CHECK_TOPIC}:1:1,${DNS_CHECK_TOPIC}:1:1"
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -41,12 +40,10 @@ services:
   # Poke stuff
   ui:
     restart: always
-    logging:
-      driver: none
     image: wpoke/poke-ui:latest
     ports:
       - "8080:8080"
-    command: ["npm", "run", "start"]
+    command: ["npm", "run", "serve"]
     volumes:
       - ./ressources/poke-ui/conf.json:/app/src/assets/conf.json
 
@@ -58,7 +55,7 @@ services:
     command: ["/opt/bin/poke-api"]
     environment:
       EVOLUTIONS_AUTOAPPLY: "true"
-      SCHEDULER_ENABLED: "false"
+      SCHEDULER_ENABLED: "true"
       APP_SECRET: "some-awesome-secret"
       MACAROONS_SECRET: "i-love-macaroons"
       JAAS_PATH: "conf/kafkacreds.jaas"
